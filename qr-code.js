@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         生成二维码图标
 // @namespace    chentao1006
-// @version      1.0
+// @version      1.0.1
 // @description  在页面左下角添加一个图标，点击后生成当前页面地址二维码
 // @match        *://*/*
 // @grant        GM_addStyle
