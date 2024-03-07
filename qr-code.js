@@ -1,12 +1,16 @@
 // ==UserScript==
 // @name         生成二维码图标
-// @namespace    chentao1006
-// @version      1.0.1
+// @author       chentao1006
+// @namespace    https://github.com/chentao1006/user-scripts
+// @version      1.0.2
 // @description  在页面左下角添加一个图标，点击后生成当前页面地址二维码
 // @match        *://*/*
 // @grant        GM_addStyle
 // ==/UserScript==
 (function() {
+    if (window.self !== window.top) {
+        return;
+    }
     'use strict';
     // 添加图标样式
     GM_addStyle(`
