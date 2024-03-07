@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         生成二维码图标
 // @author       chentao1006
-// @namespace    https://github.com/chentao1006/user-scripts
+// @namespace    https://chentao1006.com
 // @version      1.0.2
 // @description  在页面左下角添加一个图标，点击后生成当前页面地址二维码
 // @match        *://*/*
