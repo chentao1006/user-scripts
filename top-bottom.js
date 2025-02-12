@@ -47,17 +47,14 @@ if(self==top) create_bottom_button();
 		'N' : function() { scrollBy(0,  150) }, 					// 往下翻多一点
 		'd' : function() { scrollBy(0,  window.innerHeight / 2) },
 		'D' : function() { scrollBy(0,  window.innerHeight / 2) },  // 往下翻（最多）
-		
 		'k' : function() { scrollBy(0, -40) },
 		'K' : function() { scrollBy(0, -40) }, 						// 往上翻一点点
         'm' : function() { scrollBy(0, -150) },
 		'M' : function() { scrollBy(0, -150) }, 					// 往上翻多一点
 		'a' : function() { scrollBy(0, -window.innerHeight / 2) },
 		'A' : function() { scrollBy(0, -window.innerHeight / 2) },  // 往上翻（最多）
-		
 		'w' : function() { scrollTo(0, 0) },
 		'W' : function() { scrollTo(0, 0) },						// 回页首
-		
 		's' : function() { scrollTo(0,document.body.scrollHeight) },
 		'S' : function() { scrollTo(0,document.body.scrollHeight) },// 回页尾
     };
@@ -75,20 +72,3 @@ if(self==top) create_bottom_button();
             }
         }, false);
 })();
-
-/* 
-//快速跳转至Firefox吧
-var Firefox = /tieba\.baidu\.com/i.test(location.href);
-!Firefox && openFirefoxBar();// 判断是否为贴吧页面
-function openFirefoxBar(){
-	var k=[];
-	document.addEventListener('keydown', function(e){
-		k.push(e.keyCode);
-		if(k.toString().indexOf('70,73,82,69,70,79,88')>=0){
-		   GM_openInTab('http://tieba.baidu.com/f?kw=firefox');
-		   k=[];
-		}
-	}, false); 
-};
-*/
-🔗
