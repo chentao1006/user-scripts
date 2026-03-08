@@ -55,4 +55,10 @@ Feel free to open an issue or submit a pull request if you have suggestions for 
 
 ---
 
+## ⚖️ License
+
+This project is licensed under the [MIT License](./LICENSE). You are free to share, modify, and use the code as long as you include the original license notice.
+
+---
+
 **Developed by [chentao1006](https://github.com/chentao1006)**

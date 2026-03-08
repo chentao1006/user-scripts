@@ -1,13 +1,14 @@
 // ==UserScript==
 // @name         生成二维码图标
 // @author       chentao1006
-// @namespace    https://chentao1006.com
+// @namespace    https://ct106.com
 // @version      1.0.2
 // @description  在页面左下角添加一个图标，点击后生成当前页面地址二维码
 // @match        *://*/*
 // @grant        GM_addStyle
+// @license      MIT
 // ==/UserScript==
-(function() {
+(function () {
     if (window.self !== window.top) {
         return;
     }
@@ -28,7 +29,7 @@
     qrCodeIcon.id = 'qrCodeIcon';
     qrCodeIcon.innerHTML = '🔗';
     // 添加图标点击事件
-    qrCodeIcon.addEventListener('click', function() {
+    qrCodeIcon.addEventListener('click', function () {
         // 获取当前页面地址
         var currentPageUrl = window.location.href;
         // 创建二维码图片元素
@@ -38,7 +39,7 @@
         qrCodeImg.style.bottom = '10px';
         qrCodeImg.style.left = '10px';
         qrCodeImg.style.zIndex = '9999';
-        qrCodeImg.addEventListener('click', function() {
+        qrCodeImg.addEventListener('click', function () {
             document.body.removeChild(qrCodeImg);
         })
         // 添加二维码图片到页面
