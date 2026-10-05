@@ -1,141 +1,465 @@
 // ==UserScript==
 // @name         Light Force
+// @name:zh      Light Force (光明原力)
 // @namespace    https://ct106.com
-// @version      1.0
-// @description  May the Light Force be with you. Forces dark-themed websites into light mode, leaving originally light websites unaffected.
+// @version      1.4.0
+// @description  May the Light Force be with you! Forces dark-themed websites into light mode, leaving originally light websites unaffected.
+// @description:zh 愿光明原力与你同在！将深色模式网站强制转为浅色模式，不影响原生浅色网站。
 // @author       chentao1006
 // @match        *://*/*
 // @grant        GM_getValue
 // @grant        GM_setValue
 // @grant        GM_registerMenuCommand
 // @run-at       document-start
-// @license      MIT
+// @allFrames     true
 // ==/UserScript==
 
 (function () {
   'use strict';
 
-  // 1. Get initial state safely
-  let isEnabled = GM_getValue('lightForceEnabled');
-  if (isEnabled === undefined) isEnabled = true;
+  const lang = navigator.language.startsWith('zh') ? 'zh' : 'en';
+  const i18n = {
+    zh: {
+      enabled: '已启用',
+      disabled: '已禁用',
+      yes: '是',
+      no: '否',
+      enableForce: '启用 强制浅色模式',
+      disableForce: '禁用 强制浅色模式',
+      enableDaylight: '启用 仅系统浅色时生效',
+      disableDaylight: '禁用 仅系统浅色时生效',
+      status: '状态',
+      onlyDaylight: '仅系统浅色时生效',
+      darkDetected: '探测到深色页面 — 应用滤镜反转',
+      lightDetected: '页面为浅色 — 检查深色容器',
+      dynamicDark: '页面动态变为深色 — 应用滤镜反转',
+      daylightActive: '已开启“仅系统浅色时生效”，且当前系统为深色。跳过。',
+      runMode: '生效范围',
+      exclusionMode: '除列表外所有网站',
+      inclusionMode: '仅列表内网站',
+      addToList: '将当前网站加入列表',
+      removeFromList: '从列表中移除当前网站',
+      siteInList: '当前网站已在列表中',
+      siteNotInList: '当前网站不在列表中',
+      manageSiteList: '管理网站列表',
+      manageSiteListPrompt: '请输入生效网站的域名列表（以英文逗号分隔）：'
+    },
+    en: {
+      enabled: 'Enabled',
+      disabled: 'Disabled',
+      yes: 'Yes',
+      no: 'No',
+      enableForce: 'Enable Light Force',
+      disableForce: 'Disable Light Force',
+      enableDaylight: 'Enable Only in System Light Mode',
+      disableDaylight: 'Disable Only in System Light Mode',
+      status: 'Status',
+      onlyDaylight: 'Only in System Light Mode',
+      darkDetected: 'Page detected as dark — applying filter inversion',
+      lightDetected: 'Page is light — checking for dark containers',
+      dynamicDark: 'Page turned dark dynamically — applying filter inversion',
+      daylightActive: '"Only in System Light Mode" is active and system is currently in Dark Mode. Skipping.',
+      runMode: 'Run Mode',
+      exclusionMode: 'All sites except list',
+      inclusionMode: 'Specific sites only',
+      addToList: 'Add site to list',
+      removeFromList: 'Remove site from list',
+      siteInList: 'Current site is in list',
+      siteNotInList: 'Current site is not in list',
+      manageSiteList: 'Manage Site List',
+      manageSiteListPrompt: 'Enter the list of domains (comma separated):'
+    }
+  }[lang];
 
-  console.log('[Light Force] Status:', isEnabled ? 'Enabled' : 'Disabled');
+  let isEnabled = GM_getValue('lightForceEnabled', true);
+  let isOnlyDaylight = GM_getValue('onlyDaylightEnabled', false);
+  let runMode = GM_getValue('runMode', 'inclusion');
+  let siteList = GM_getValue('siteList', []);
+  const hostname = window.location.hostname;
 
-  // 2. Register menu command to toggle
-  const menuLabel = isEnabled ? 'Disable Light Force' : 'Enable Light Force';
-  GM_registerMenuCommand(menuLabel, () => {
+  console.log(`[Light Force] ${i18n.status}:`, isEnabled ? i18n.enabled : i18n.disabled, `| ${i18n.onlyDaylight}:`, isOnlyDaylight ? i18n.yes : i18n.no, `| ${i18n.runMode}:`, runMode === 'exclusion' ? i18n.exclusionMode : i18n.inclusionMode);
+
+  GM_registerMenuCommand(isEnabled ? i18n.disableForce : i18n.enableForce, () => {
     GM_setValue('lightForceEnabled', !isEnabled);
-    console.log('[Light Force] Toggled to:', !isEnabled);
     location.reload();
   });
 
+  GM_registerMenuCommand(isOnlyDaylight ? i18n.disableDaylight : i18n.enableDaylight, () => {
+    GM_setValue('onlyDaylightEnabled', !isOnlyDaylight);
+    location.reload();
+  });
+
+  GM_registerMenuCommand(`${i18n.runMode}: ${runMode === 'exclusion' ? i18n.exclusionMode : i18n.inclusionMode}`, () => {
+    GM_setValue('runMode', runMode === 'exclusion' ? 'inclusion' : 'exclusion');
+    location.reload();
+  });
+
+  const match = siteList.find(site => hostname === site || hostname.endsWith('.' + site));
+  const isInList = !!match;
+  GM_registerMenuCommand(isInList ? i18n.removeFromList : i18n.addToList, () => {
+    let newList = [...siteList];
+    if (match) {
+      newList = newList.filter(s => s !== match);
+    } else {
+      newList.push(hostname);
+    }
+    GM_setValue('siteList', newList);
+    location.reload();
+  });
+
+  GM_registerMenuCommand(i18n.manageSiteList, () => {
+    const input = prompt(i18n.manageSiteListPrompt, siteList.join(', '));
+    if (input !== null) {
+      const newList = input.split(',').map(s => s.trim()).filter(Boolean);
+      GM_setValue('siteList', newList);
+      location.reload();
+    }
+  });
+
   if (isEnabled) {
+    if (runMode === 'exclusion' && isInList) {
+      console.log(`[Light Force] ${i18n.siteInList}. Skipping.`);
+      return;
+    }
+    if (runMode === 'inclusion' && !isInList) {
+      console.log(`[Light Force] ${i18n.siteNotInList}. Skipping.`);
+      return;
+    }
+
+    if (isOnlyDaylight && window.matchMedia('(prefers-color-scheme: dark)').matches) {
+      console.log(`[Light Force] ${i18n.daylightActive}`);
+      return;
+    }
     applyLightForce();
   }
 
-  function applyLightForce() {
-    // 1. Force the color-scheme CSS property on root element
-    const style = document.createElement('style');
-    style.id = 'light-force-css';
-    style.textContent = `
-            :root, html, body {
-                color-scheme: light !important;
-            }
-        `;
+  // ─── Utility: WCAG relative luminance ─────────────────────────────────────
+  function getLuminance(r, g, b) {
+    const [rs, gs, bs] = [r, g, b].map(c => {
+      c = c / 255;
+      return c <= 0.03928 ? c / 12.92 : Math.pow((c + 0.055) / 1.055, 2.4);
+    });
+    return 0.2126 * rs + 0.7152 * gs + 0.0722 * bs;
+  }
 
-    // Inject immediately
-    if (document.head || document.documentElement) {
+  function parseColor(colorStr) {
+    if (!colorStr || colorStr === 'transparent' || colorStr === 'rgba(0, 0, 0, 0)') return null;
+    const match = colorStr.match(/rgba?\((\d+),\s*(\d+),\s*(\d+)(?:,\s*([\d.]+))?\)/);
+    if (match) {
+      const a = match[4] !== undefined ? parseFloat(match[4]) : 1;
+      if (a < 0.1) return null;
+      return { r: parseInt(match[1]), g: parseInt(match[2]), b: parseInt(match[3]), a };
+    }
+    return null;
+  }
+
+  function isDarkColor(r, g, b) { return getLuminance(r, g, b) < 0.12; }
+  function isLightColor(r, g, b) { return getLuminance(r, g, b) > 0.4; }
+
+  function isTextDark(el) {
+    if (!el) return false;
+    const style = window.getComputedStyle(el);
+    const color = parseColor(style.color);
+    return color && getLuminance(color.r, color.g, color.b) < 0.25;
+  }
+
+  // ─── Extract effective background from an element ─────────────────────────
+  function getEffectiveBackground(el) {
+    if (!el) return null;
+    const style = window.getComputedStyle(el);
+    const bg = parseColor(style.backgroundColor);
+    if (bg) return bg;
+    const bgImage = style.backgroundImage;
+    if (bgImage && bgImage !== 'none') {
+      const gradientColors = bgImage.match(/rgba?\(\d+,\s*\d+,\s*\d+(?:,\s*[\d.]+)?\)/g);
+      if (gradientColors) {
+        let dc = 0;
+        for (const cs of gradientColors) { const c = parseColor(cs); if (c && isDarkColor(c.r, c.g, c.b)) dc++; }
+        if (dc > gradientColors.length / 2) return parseColor(gradientColors[0]);
+      }
+    }
+    return null;
+  }
+
+  // ─── Detect if the page is dark (multi-strategy) ──────────────────────────
+  function isPageDark() {
+    // Strategy 0: Master Light Override
+    const mt = document.querySelectorAll('div, section, main, article');
+    for (const el of mt) {
+      const r = el.getBoundingClientRect();
+      if (r.width > window.innerWidth * 0.6 && r.height > window.innerHeight * 0.4) {
+        const bg = getEffectiveBackground(el);
+        if (bg && isLightColor(bg.r, bg.g, bg.b)) return false;
+      }
+    }
+
+    // Strategy 1: html and body
+    for (const el of [document.documentElement, document.body]) {
+      if (!el) continue;
+
+      // --- NEW: Check for explicit color-scheme property ---
+      const style = window.getComputedStyle(el);
+      if (style.colorScheme === 'dark') return true;
+
+      const bg = getEffectiveBackground(el);
+      if (!bg) continue;
+
+      // --- NEW: Definitive Light Signal ---
+      if (isLightColor(bg.r, bg.g, bg.b)) return false;
+
+      // --- NEW: Relaxed explicit check for body/html ---
+      if (isDarkColor(bg.r, bg.g, bg.b)) {
+        const luminance = getLuminance(bg.r, bg.g, bg.b);
+        if (luminance < 0.05 && !isTextDark(el)) return true;
+        if (!isTextDark(el)) return true;
+      }
+    }
+
+    // Strategy 1.5: Check meta tags
+    const themeColorMeta = document.querySelector('meta[name="theme-color"]');
+    if (themeColorMeta) {
+      const content = themeColorMeta.getAttribute('content');
+      if (content && content.toLowerCase() === '#000000') return true;
+    }
+    const statusBarStyle = document.querySelector('meta[name="apple-mobile-web-app-status-bar-style"]');
+    if (statusBarStyle && statusBarStyle.getAttribute('content') === 'black') return true;
+
+    // Strategy 2: Sample first-level children
+    if (document.body) {
+      const children = document.body.children;
+      let db = 0, dt = 0, s = 0;
+      for (let i = 0; i < Math.min(children.length, 12); i++) {
+        const child = children[i];
+        if (!child || ['SCRIPT', 'STYLE', 'LINK', 'NOSCRIPT'].includes(child.tagName)) continue;
+        const rect = child.getBoundingClientRect();
+        if (rect.width < 50 || rect.height < 20) continue;
+        const bg = getEffectiveBackground(child);
+        if (bg && isDarkColor(bg.r, bg.g, bg.b)) db++;
+        if (isTextDark(child)) dt++;
+        s++;
+      }
+      if (s > 0 && db / s >= 0.4 && dt / s < 0.3) return true;
+    }
+
+    // Strategy 3: elementFromPoint sampling
+    try {
+      const vw = window.innerWidth, vh = window.innerHeight;
+      const points = [[vw * 0.5, vh * 0.1], [vw * 0.5, vh * 0.5], [vw * 0.1, vh * 0.5], [vw * 0.9, vh * 0.5], [vw * 0.5, vh * 0.9]];
+      let db = 0, dt = 0, ts = 0;
+      for (const [x, y] of points) {
+        const el = document.elementFromPoint(x, y);
+        if (!el) continue;
+        let curr = el, foundBg = false;
+        while (curr && curr !== document.documentElement) {
+          const bg = getEffectiveBackground(curr);
+          if (bg) { if (isDarkColor(bg.r, bg.g, bg.b)) db++; foundBg = true; break; }
+          curr = curr.parentElement;
+        }
+        if (foundBg) { if (isTextDark(el)) dt++; ts++; }
+      }
+      if (ts >= 3 && db / ts >= 0.5 && dt / ts < 0.3) return true;
+    } catch (e) { }
+
+    // Strategy 4: Recursive descent into large containers
+    if (document.body) {
+      const queue = [...document.body.children];
+      let depth = 0;
+      while (queue.length > 0 && depth < 3) {
+        depth++;
+        const nextQueue = [];
+        for (const child of queue) {
+          if (!child || !child.getBoundingClientRect) continue;
+          if (['SCRIPT', 'STYLE', 'LINK', 'NOSCRIPT'].includes(child.tagName)) continue;
+          const rect = child.getBoundingClientRect();
+          if (rect.width < window.innerWidth * 0.5 || rect.height < window.innerHeight * 0.3) continue;
+          const bg = getEffectiveBackground(child);
+          if (bg && isDarkColor(bg.r, bg.g, bg.b)) return true;
+          if (child.children) nextQueue.push(...child.children);
+        }
+        queue.length = 0;
+        queue.push(...nextQueue);
+      }
+    }
+    return false;
+  }
+
+  // ─── Phase 1: Flip known theme signals ────────────────────────────────────
+  function flipThemeSignals() {
+    if (!document.getElementById('light-force-color-scheme')) {
+      const style = document.createElement('style');
+      style.id = 'light-force-color-scheme';
+      style.textContent = ':root, html, body { color-scheme: light !important; }';
       (document.head || document.documentElement).appendChild(style);
-    } else {
-      document.addEventListener('DOMContentLoaded', () => {
-        (document.head || document.documentElement).appendChild(style);
+    }
+
+    const root = document.documentElement;
+    if (root) {
+      if (root.classList.contains('dark')) { root.classList.remove('dark'); root.classList.add('light'); }
+      ['dark-mode', 'dark-theme', 'theme-dark', 'night', 'night-mode', 'theme-system'].forEach(cls => {
+        if (root.classList.contains(cls)) {
+          root.classList.remove(cls);
+          if (cls === 'theme-system') root.classList.add('theme-light');
+        }
+      });
+      ['theme', 'data-theme', 'data-color-mode', 'data-color-scheme', 'data-mode', 'data-appearance', 'data-bs-theme'].forEach(attr => {
+        const val = root.getAttribute(attr);
+        if (val && /dark|night/i.test(val)) root.setAttribute(attr, val.replace(/dark|night/gi, 'light'));
+      });
+      const inlineStyle = root.getAttribute('style') || '';
+      if (/color-scheme:\s*dark/i.test(inlineStyle)) {
+        root.setAttribute('style', inlineStyle.replace(/color-scheme:\s*dark/gi, 'color-scheme: light'));
+      }
+    }
+
+    const body = document.body;
+    if (body) {
+      if (body.classList.contains('dark')) { body.classList.remove('dark'); body.classList.add('light'); }
+      ['dark-mode', 'dark-theme', 'theme-dark', 'night', 'night-mode', 'theme-system'].forEach(cls => {
+        if (body.classList.contains(cls)) {
+          body.classList.remove(cls);
+          if (cls === 'theme-system') body.classList.add('theme-light');
+        }
+      });
+      ['data-theme', 'data-color-mode', 'data-bs-theme'].forEach(attr => {
+        const val = body.getAttribute(attr);
+        if (val && /dark|night/i.test(val)) body.setAttribute(attr, val.replace(/dark|night/gi, 'light'));
       });
     }
 
-    // 2. Helper to enforce light theme
-    const enforceLight = () => {
-      const root = document.documentElement;
-      if (root) {
-        // Handle classes (Flip 'dark' to 'light')
-        if (root.classList.contains('dark')) {
-          root.classList.remove('dark');
-          root.classList.add('light');
+    if (!document.getElementById('light-force-theme-overrides')) {
+      const overrideStyle = document.createElement('style');
+      overrideStyle.id = 'light-force-theme-overrides';
+      overrideStyle.textContent = `
+        :root[data-theme="dark"], :root.dark,
+        [data-theme="dark"] body, .dark body {
+          --background: 0 0% 100% !important;
+          --foreground: 222.2 84% 4.9% !important;
+          background-color: white !important;
+          color: #1a1a1a !important;
         }
+      `;
+      (document.head || document.documentElement).appendChild(overrideStyle);
+    }
+  }
 
-        // Handle attributes (Classic themes)
-        if (root.getAttribute('theme') === 'dark') root.setAttribute('theme', 'light');
-        if (root.getAttribute('data-theme') === 'dark') root.setAttribute('data-theme', 'light');
-        if (root.getAttribute('data-color-mode') === 'dark') root.setAttribute('data-color-mode', 'light');
+  // ─── Phase 3: Universal CSS filter inversion ──────────────────────────────
+  function applyFilterInversion() {
+    if (document.getElementById('light-force-invert')) return;
+    const invertStyle = document.createElement('style');
+    invertStyle.id = 'light-force-invert';
+    invertStyle.textContent = `
+      html { filter: invert(1) hue-rotate(180deg) !important; }
+      img, video, canvas, .emoji, iframe { filter: invert(1) hue-rotate(180deg) !important; }
+      svg image { filter: invert(1) hue-rotate(180deg) !important; }
+    `;
+    (document.head || document.documentElement).appendChild(invertStyle);
+    requestAnimationFrame(() => { reInvertBackgroundImages(); });
+  }
 
-        // Handle OpenClaw specific (and common others)
-        // Note: Even if it's not set to dark, we want to force 'light'
-        if (root.getAttribute('data-theme') !== 'light') {
-          root.setAttribute('data-theme', 'light');
-        }
+  function reInvertBackgroundImages() {
+    if (document.getElementById('light-force-bg-reinvert')) return;
+    const walker = document.createTreeWalker(document.body || document.documentElement, NodeFilter.SHOW_ELEMENT, null);
+    const leafRules = [], containerRules = [];
+    let count = 0, node;
+    while ((node = walker.nextNode()) && count < 5000) {
+      count++;
+      const style = window.getComputedStyle(node);
+      const bg = style.backgroundImage;
+      if (!bg || bg === 'none' || !bg.includes('url(')) continue;
+      const uid = 'lf-' + Math.random().toString(36).substr(2, 6);
+      node.setAttribute('data-lf-bg', uid);
 
-        // Handle hardcoded style attribute on root
-        const currentStyle = root.getAttribute('style') || '';
-        if (currentStyle.includes('color-scheme: dark')) {
-          root.setAttribute('style', currentStyle.replace(/color-scheme:\s*dark/g, 'color-scheme: light'));
-        }
+      const hasMedia = node.querySelector('img, video, canvas, iframe');
+      const isLarge = node.offsetWidth > window.innerWidth * 0.4 && node.offsetHeight > window.innerHeight * 0.4;
+      if (hasMedia || isLarge || node === document.body || node === document.documentElement) {
+        containerRules.push(`
+          [data-lf-bg="${uid}"] { position: relative !important; background-image: none !important; z-index: 0 !important; }
+          [data-lf-bg="${uid}"]::before {
+            content: "" !important; position: absolute !important; top: 0 !important; left: 0 !important; width: 100% !important; height: 100% !important;
+            background-image: ${bg} !important; background-size: ${style.backgroundSize} !important; background-position: ${style.backgroundPosition} !important;
+            background-repeat: ${style.backgroundRepeat} !important; background-attachment: ${style.backgroundAttachment} !important;
+            filter: invert(1) hue-rotate(180deg) !important; z-index: -1 !important; pointer-events: none !important; opacity: ${style.opacity} !important;
+          }
+        `);
+      } else {
+        leafRules.push(`[data-lf-bg="${uid}"] { filter: invert(1) hue-rotate(180deg) !important; }`);
       }
+    }
+    if (leafRules.length > 0 || containerRules.length > 0) {
+      const bgStyle = document.createElement('style');
+      bgStyle.id = 'light-force-bg-reinvert';
+      bgStyle.textContent = leafRules.join('\n') + '\n' + containerRules.join('\n');
+      document.head.appendChild(bgStyle);
+    }
+  }
 
-      const body = document.body;
-      if (body) {
-        if (body.classList.contains('dark')) {
-          body.classList.remove('dark');
-          body.classList.add('light');
-        }
-        if (body.getAttribute('data-theme') === 'dark') body.setAttribute('data-theme', 'light');
-        if (body.getAttribute('data-theme') !== 'light') body.setAttribute('data-theme', 'light');
+  // ─── Phase 4: Illuminate specific dark containers (for mixed-theme sites) ────
+  function illuminateSpecificDarkAreas() {
+    if (document.getElementById('light-force-invert')) return;
+    const selector = 'header, footer, nav, aside, [class*="header"], [class*="nav"], [class*="footer"], [class*="banner"], [class*="topbar"]';
+    const targets = document.querySelectorAll(selector);
+    targets.forEach(el => {
+      if (el.hasAttribute('data-lf-illuminated')) return;
+      const rect = el.getBoundingClientRect();
+      if (rect.width < 100 || rect.height < 20) return;
+      const bg = getEffectiveBackground(el);
+      if (bg && isDarkColor(bg.r, bg.g, bg.b)) {
+        el.setAttribute('data-lf-illuminated', 'true');
+        el.style.filter = 'invert(1) hue-rotate(180deg)';
+        el.querySelectorAll('img, video, canvas, svg, [style*="background-image"]').forEach(media => {
+          media.style.filter = 'invert(1) hue-rotate(180deg)';
+        });
       }
+    });
+  }
 
-      // 3. Target specific elements that use hardcoded dark classes (Tailwind, etc.)
-      const darkElements = document.querySelectorAll('.bg-black, .bg-gray-900, .bg-zinc-950, [class*="bg-black/"], [class*="bg-zinc-950/"], .bg-slate-950');
-      darkElements.forEach(el => {
-        if (window.getComputedStyle(el).position === 'fixed' || window.getComputedStyle(el).position === 'absolute') {
-          el.style.setProperty('background-color', 'rgba(255, 255, 255, 0.8)', 'important');
+  // ─── Main ──────────────────────────────────────────────────────────────────
+  function applyLightForce() {
+    flipThemeSignals();
+
+    const detectAndFix = () => {
+      flipThemeSignals();
+      requestAnimationFrame(() => {
+        if (isPageDark()) {
+          console.log(`[Light Force] ${i18n.darkDetected}`);
+          applyFilterInversion();
         } else {
-          el.style.setProperty('background-color', 'white', 'important');
-          el.style.setProperty('color', '#1a1a1a', 'important');
+          console.log(`[Light Force] ${i18n.lightDetected}`);
+          illuminateSpecificDarkAreas();
         }
-      });
-
-      // Fix invisible text (light text on white background)
-      const lightTextElements = document.querySelectorAll('.text-gray-100, .text-zinc-100, .text-white, .text-slate-100, .text-zinc-400, .text-gray-400');
-      lightTextElements.forEach(el => {
-        el.style.setProperty('color', '#333', 'important'); // Force dark gray
       });
     };
 
-    // 4. More aggressive CSS injection for sites that hardcode dark mode
-    const forceLightCSS = document.createElement('style');
-    forceLightCSS.id = 'light-force-global-overrides';
-    forceLightCSS.textContent = `
-        /* Overwrite common dark mode variables if they exist at :root */
-        :root[data-theme="dark"], :root.dark {
-            --background: 0 0% 100% !important;
-            --foreground: 222.2 84% 4.9% !important;
+    if (document.readyState === 'loading') {
+      document.addEventListener('DOMContentLoaded', () => { setTimeout(detectAndFix, 50); });
+    } else {
+      setTimeout(detectAndFix, 50);
+    }
+
+    window.addEventListener('load', () => { setTimeout(detectAndFix, 200); });
+
+    const observer = new MutationObserver(() => {
+      clearTimeout(observer._timer);
+      observer._timer = setTimeout(() => {
+        flipThemeSignals();
+        if (!document.getElementById('light-force-invert')) {
+          requestAnimationFrame(() => {
+            if (isPageDark()) {
+              console.log(`[Light Force] ${i18n.dynamicDark}`);
+              applyFilterInversion();
+            } else {
+              illuminateSpecificDarkAreas();
+            }
+          });
         }
-        /* Generic fallback inversion for very stubborn elements */
-        [data-theme="dark"] body {
-            background-color: white !important;
-            color: black !important;
-        }
-    `;
-    (document.head || document.documentElement).appendChild(forceLightCSS);
-
-    // Run immediately
-    enforceLight();
-
-    // 3. Monitor for changes
-    const observer = new MutationObserver(enforceLight);
-
-    observer.observe(document.documentElement, {
-      attributes: true,
-      childList: true,
-      subtree: true,
-      attributeFilter: ['class', 'theme', 'data-theme', 'data-color-mode', 'style']
+      }, 200);
     });
+
+    if (document.documentElement) {
+      observer.observe(document.documentElement, {
+        attributes: true, childList: true, subtree: true, // Improved SPA support
+        attributeFilter: ['class', 'theme', 'data-theme', 'data-color-mode', 'style', 'data-bs-theme']
+      });
+    }
   }
 })();
