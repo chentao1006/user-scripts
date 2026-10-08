@@ -1,8 +1,8 @@
 // ==UserScript==
 // @name         Link Text Selector
 // @namespace    https://ct106.com/
-// @version      1.2
-// @description  Press Shift to temporarily turn hovered links into selectable text. Click elsewhere to restore.
+// @version      1.3
+// @description  Press Shift to temporarily turn hovered links, buttons, or inputs into selectable text. Click elsewhere to restore.
 // @author       Chen Tao
 // @copyright    Copyright (c) 2026 Chen Tao. All rights reserved.
 // @license      MIT
@@ -16,36 +16,55 @@
  * Copyright (c) 2026 Chen Tao
  * Licensed under the MIT License.
  *
- * Press Shift while hovering over a link to make its text selectable.
- * Click elsewhere or press Escape to restore the original link.
+ * Press Shift while hovering over a link, button, or input to make its text selectable.
+ * Click elsewhere or press Escape to restore the original element.
  */
 
 (function () {
     'use strict';
 
-    let activeLink = null;
+    let activeElement = null;
     let placeholder = null;
+    const convertibleSelector = 'a[href], button, input';
 
-    // Restore the original link
+    // Restore the original element
     function restore() {
-        if (!activeLink || !placeholder) return;
+        if (!activeElement || !placeholder) return;
 
         if (placeholder.isConnected) {
-            placeholder.replaceWith(activeLink);
+            placeholder.replaceWith(activeElement);
         }
 
-        activeLink = null;
+        activeElement = null;
         placeholder = null;
     }
 
-    // Convert a link into selectable text
-    function convert(link) {
-        if (!link || !link.isConnected) return;
+    function getInputText(input) {
+        switch (input.type) {
+            case 'password':
+                return '\u2022'.repeat(input.value.length);
+            case 'file':
+                return Array.from(input.files || [], file => file.name).join(', ');
+            case 'checkbox':
+            case 'radio': {
+                const value = input.value === 'on' ? '' : input.value;
+                return `[${input.checked ? 'x' : ' '}]${value ? ` ${value}` : ''}`;
+            }
+            case 'image':
+                return input.alt || input.value;
+            default:
+                return input.value || input.placeholder;
+        }
+    }
+
+    // Convert a link or form control into selectable text
+    function convert(element) {
+        if (!element || !element.isConnected) return;
 
         restore();
 
         const span = document.createElement('span');
-        const style = getComputedStyle(link);
+        const style = getComputedStyle(element);
 
         // Preserve appearance and highlight selectable state
         span.style.cssText = `
@@ -68,16 +87,19 @@
             -webkit-box-decoration-break: clone;
         `;
 
-        // Clone content while preserving the original element
-        span.append(...Array.from(link.childNodes, node => node.cloneNode(true)));
+        if (element instanceof HTMLInputElement) {
+            span.textContent = getInputText(element);
+        } else {
+            span.append(...Array.from(element.childNodes, node => node.cloneNode(true)));
+        }
 
-        activeLink = link;
+        activeElement = element;
         placeholder = span;
 
-        link.replaceWith(span);
+        element.replaceWith(span);
     }
 
-    // Block original link events while allowing text selection
+    // Block original element events while allowing text selection
     function blockLinkEvents(event) {
         if (!placeholder) return;
 
@@ -106,24 +128,24 @@
         document.addEventListener(type, blockLinkEvents, true);
     });
 
-    // Activate when Shift is pressed over a link
+    // Activate when Shift is pressed over a link or form control
     document.addEventListener('keydown', (event) => {
         if (event.key !== 'Shift' || event.repeat) return;
         if (event.ctrlKey || event.altKey || event.metaKey) return;
 
         const hovered = document.querySelectorAll(':hover');
-        let link = null;
+        let element = null;
 
         for (let i = hovered.length - 1; i >= 0; i--) {
-            if (hovered[i].matches?.('a[href]')) {
-                link = hovered[i];
+            if (hovered[i].matches?.(convertibleSelector)) {
+                element = hovered[i];
                 break;
             }
         }
 
-        if (link) {
+        if (element) {
             event.preventDefault();
-            convert(link);
+            convert(element);
         }
     }, true);
 
