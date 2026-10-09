@@ -66,9 +66,9 @@
         const span = document.createElement('span');
         const style = getComputedStyle(element);
 
-        // Preserve appearance and highlight selectable state
+        // Keep the highlighted text legible on light and dark-themed pages.
         span.style.cssText = `
-            color: ${style.color};
+            color: #202124 !important;
             font: ${style.font};
             font-size: ${style.fontSize};
             font-weight: ${style.fontWeight};

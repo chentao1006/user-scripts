@@ -20,6 +20,9 @@ Adds convenient buttons and keyboard shortcuts to quickly navigate through long 
     *   `m` / `M`: Scroll up (150px)
     *   `a` / `A`: Scroll up half a page
 
+### 🔗 [Link Text Selector](./link-selector.js)
+Temporarily turns hovered links, buttons, or inputs into selectable text when you press `Shift`. The highlighted text stays readable on dark-themed websites, and clicking elsewhere or pressing `Escape` restores the original element.
+
 ### ☀️ [Light Force](./light-force.js)
 Forces dark-themed websites into a clean light mode. Perfect for those who prefer light interfaces even on sites that don't natively support them.
 
