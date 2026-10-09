@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Link Text Selector
 // @namespace    https://ct106.com/
-// @version      1.3
+// @version      1.4
 // @description  Press Shift to temporarily turn hovered links, buttons, or inputs into selectable text. Click elsewhere to restore.
 // @author       Chen Tao
 // @copyright    Copyright (c) 2026 Chen Tao. All rights reserved.
