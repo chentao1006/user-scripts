@@ -1,8 +1,8 @@
 // ==UserScript==
 // @name         Link Text Selector
 // @namespace    https://ct106.com/
-// @version      1.4
-// @description  Press Shift to temporarily turn hovered links, buttons, or inputs into selectable text. Click elsewhere to restore.
+// @version      1.5
+// @description  Press Shift to temporarily turn hovered links, buttons, or non-text inputs into selectable text. Click elsewhere to restore.
 // @author       Chen Tao
 // @copyright    Copyright (c) 2026 Chen Tao. All rights reserved.
 // @license      MIT
@@ -16,7 +16,7 @@
  * Copyright (c) 2026 Chen Tao
  * Licensed under the MIT License.
  *
- * Press Shift while hovering over a link, button, or input to make its text selectable.
+ * Press Shift while hovering over a link, button, or non-text input to make its text selectable.
  * Click elsewhere or press Escape to restore the original element.
  */
 
@@ -25,7 +25,27 @@
 
     let activeElement = null;
     let placeholder = null;
-    const convertibleSelector = 'a[href], button, input';
+    const textInputTypes = new Set([
+        'text',
+        'search',
+        'url',
+        'tel',
+        'email',
+        'password',
+        'number'
+    ]);
+
+    function isTextInput(element) {
+        if (!element) return false;
+        if (element instanceof HTMLTextAreaElement) return true;
+        if (element instanceof HTMLInputElement) return textInputTypes.has(element.type);
+        return element.isContentEditable;
+    }
+
+    function isConvertible(element) {
+        if (element.matches?.('a[href], button')) return true;
+        return element instanceof HTMLInputElement && !isTextInput(element);
+    }
 
     // Restore the original element
     function restore() {
@@ -41,8 +61,6 @@
 
     function getInputText(input) {
         switch (input.type) {
-            case 'password':
-                return '\u2022'.repeat(input.value.length);
             case 'file':
                 return Array.from(input.files || [], file => file.name).join(', ');
             case 'checkbox':
@@ -132,12 +150,13 @@
     document.addEventListener('keydown', (event) => {
         if (event.key !== 'Shift' || event.repeat) return;
         if (event.ctrlKey || event.altKey || event.metaKey) return;
+        if (isTextInput(document.activeElement)) return;
 
         const hovered = document.querySelectorAll(':hover');
         let element = null;
 
         for (let i = hovered.length - 1; i >= 0; i--) {
-            if (hovered[i].matches?.(convertibleSelector)) {
+            if (isConvertible(hovered[i])) {
                 element = hovered[i];
                 break;
             }
